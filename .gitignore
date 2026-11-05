@@ -1,7 +1,15 @@
+Handoff.md
+prompt.txt
+response.txt
+lit_survey/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
+.venv/
+venv/
+.env
 
 # C extensions
 *.so
