@@ -2,7 +2,7 @@
 
 AI-powered mobile app to teach and assess the Asamyukta Hastas (single-hand mudras) using close-range phone camera input. Learning mode gives real-time feedback on one mudra at a time. Assessment mode scores previously learned mudras and tracks progress. Mistakes (finger bending, thumb placement, finger spacing, palm orientation) are flagged with landmark overlays.
 
-**Status:** Phase 3 in progress (landmark classifier baseline done; geometric assessment features drafted). No app code yet. See `HANDOFF.md`.
+**Status:** Phase 4 started. Offline analysis done; a desktop webcam prototype (`scripts/12_webcam_demo.py`) works "somewhat correctly" per the owner's informal test (not systematically evaluated). No Flutter code yet. See `HANDOFF.md`.
 
 ## Pipeline
 
@@ -41,15 +41,20 @@ from google.colab import drive; drive.mount('/content/drive')
 
 ## Scripts (run in order from project root)
 
-| Script                    | Purpose                                                       | Output                                                                                   |
-| ------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `01_audit_dataset.py`     | MediaPipe detection audit on single-hand images               | `data/interim/landmarks_raw.csv`, `detection_summary.csv`, `models/hand_landmarker.task` |
-| `02_diagnose_failures.py` | Failure contact sheets; retry failures with 50% gray padding  | `data/interim/landmarks_padded_retry.csv`, `failures/*.png`                              |
-| `03_build_landmarks.py`   | Merge raw + padded landmarks, add Hamsapaksha                 | `data/processed/landmarks.csv`                                                           |
-| `04_baseline.py`          | RF / SVM / MLP on normalized landmarks, random vs block split | printed metrics                                                                          |
-| `05_confusions.py`        | Mirror-normalization test, worst classes and confusions       | printed metrics                                                                          |
-| `07_pixel_coords.py`      | Convert landmarks to pixel coords (all images 666x500)        | `data/processed/landmarks_px.csv`                                                        |
-| `06_geom_features.py`     | Joint angles, tip distances, spread, palm tilt; draft ranges  | `data/processed/reference_ranges_draft.csv`                                              |
+| Script                    | Purpose                                                                                                    | Output                                                                                   |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `01_audit_dataset.py`     | MediaPipe detection audit on single-hand images                                                            | `data/interim/landmarks_raw.csv`, `detection_summary.csv`, `models/hand_landmarker.task` |
+| `02_diagnose_failures.py` | Failure contact sheets; retry failures with 50% gray padding                                               | `data/interim/landmarks_padded_retry.csv`, `failures/*.png`                              |
+| `03_build_landmarks.py`   | Merge raw + padded landmarks, add Hamsapaksha                                                              | `data/processed/landmarks.csv`                                                           |
+| `04_baseline.py`          | RF / SVM / MLP on normalized landmarks, random vs block split                                              | printed metrics                                                                          |
+| `05_confusions.py`        | Mirror-normalization test, worst classes and confusions                                                    | printed metrics                                                                          |
+| `08_range_scoring.py`     | Per-feature p05-p95 box scoring (rules-only)                                                               | printed metrics                                                                          |
+| `09_mahalanobis.py`       | Per-class Mahalanobis scoring                                                                              | printed metrics                                                                          |
+| `10_synthetic_errors.py`  | Synthetic finger-flex errors: score drop and blame accuracy                                                | printed metrics                                                                          |
+| `11_save_artifacts.py`    | Fit final MLP on all data, save class median/IQR stats (demo only; train acc is memorized)                 | `models/mlp.joblib`, `models/class_stats.json`                                           |
+| `12_webcam_demo.py`       | Local webcam demo: `--target <Mudra> [--flip]`; shows prediction, P(target), top blamed feature and joints | window                                                                                   |
+| `07_pixel_coords.py`      | Convert landmarks to pixel coords (all images 666x500)                                                     | `data/processed/landmarks_px.csv`                                                        |
+| `06_geom_features.py`     | Joint angles, tip distances, spread, palm tilt; draft ranges                                               | `data/processed/reference_ranges_draft.csv`                                              |
 
 ## Results so far
 
@@ -65,6 +70,13 @@ from google.colab import drive; drive.mount('/content/drive')
 - Random split: RF 0.944, SVM 0.947, MLP 0.957 (gap to block ~1 point).
 - Wrist-relative, rotation-normalized, scale-normalized landmarks. Mirroring hurt (0.9354), so it is off.
 - Weakest class: Hamsapaksha (F1 0.80). Main confusions: Hamsapaksha/Mrigasirsha, Tripathaka/Ardhapathaka, Hamsasyam/Katakamukha_1.
+
+**Updated results (pixel coords, 5 seeds, block split):** landmarks 0.9448 ± 0.0019, geometry 0.9211 ± 0.0036, both 0.9451 ± 0.0025. Landmarks vs both is indistinguishable; geometry alone is about 2.4 points lower.
+
+**Assessment design:** correctness score = classifier P(target mudra); mistake blame = per-feature deviation from class median (robust z).
+
+- Rules-only p05-p95 boxes: 0.640 accuracy. Per-class Mahalanobis: 0.734. Both far below the MLP, so generative range scoring is not used as the score.
+- Synthetic finger flex (rotation about MCP, 300 correct samples): P(target) drop 0.05 / 0.15-0.19 / 0.28-0.34 at 20 / 40 / 60 degrees. Top-1 blame hits the right finger 53% / 75% / 85% (chance 24%). Small errors (20 degrees) are weakly detected.
 
 ## Roadmap
 
