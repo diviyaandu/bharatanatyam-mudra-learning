@@ -6,9 +6,10 @@ from mudra_features import norm, feats
 
 ap = argparse.ArgumentParser(); ap.add_argument("--target", required=True)
 ap.add_argument("--flip", action="store_true")
+ap.add_argument("--model", default="models/mlp.joblib")
 ap.add_argument("--auto", action="store_true"); a = ap.parse_args()
 FLIP_WHEN = "Left"  # MediaPipe label that means "mirror this hand"; swap to "Left" if results are backwards
-clf = joblib.load("models/mlp.joblib"); st = json.load(open("models/class_stats.json"))
+clf = joblib.load(a.model); st = json.load(open("models/class_stats.json"))
 cls = list(clf.classes_); assert a.target in cls, cls
 med = pd.Series(st["median"][a.target]); sd = pd.Series(st["sd"][a.target])
 lm = vision.HandLandmarker.create_from_options(vision.HandLandmarkerOptions(
