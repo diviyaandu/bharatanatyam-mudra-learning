@@ -70,6 +70,7 @@ class _MudraScreenState extends State<MudraScreen> {
   StreamSubscription<List<Hand>>? _sub;
   MudraClassifier? _clf;
   Map<String, dynamic>? _stats;
+  Map<String, dynamic>? _info;
   String _status = 'starting...';
   String _target = 'Pathaka';
 
@@ -94,6 +95,8 @@ class _MudraScreenState extends State<MudraScreen> {
     try {
       _clf = MudraClassifier.fromJson(await rootBundle.loadString('assets/mlp.json'));
       _stats = jsonDecode(await rootBundle.loadString('assets/class_stats.json'))
+          as Map<String, dynamic>;
+      _info = jsonDecode(await rootBundle.loadString('assets/mudras.json'))
           as Map<String, dynamic>;
       final cams = await availableCameras();
       final cam = cams.firstWhere(
@@ -265,10 +268,61 @@ class _MudraScreenState extends State<MudraScreen> {
     return '';
   }
 
+    void _showLearn() {
+    final m = _info![_target] as Map<String, dynamic>?;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: m == null
+              ? Text('No description yet for $_target.')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(m['display'] as String,
+                        style: const TextStyle(
+                            fontSize: 26, fontWeight: FontWeight.bold)),
+                    Text(m['meaning'] as String,
+                        style: const TextStyle(
+                            fontSize: 16, fontStyle: FontStyle.italic)),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Image.asset(
+                        'assets/images/${m['image']}',
+                        height: 220,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox(
+                            height: 60,
+                            child: Center(
+                                child: Text('(reference image not added yet)'))),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('How to form it',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(m['form'] as String),
+                    const SizedBox(height: 12),
+                    const Text('Traditionally used for',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(m['uses'] as String),
+                    if (m['note'] != null) ...[
+                      const SizedBox(height: 12),
+                      Text(m['note'] as String,
+                          style: const TextStyle(color: Colors.orange)),
+                    ],
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _controller;
-    if (c == null || !c.value.isInitialized || _clf == null || _stats == null) {
+    if (c == null || !c.value.isInitialized || _clf == null || _stats == null || _info == null) {
       return Scaffold(body: Center(child: Text(_status)));
     }
     final ps = c.value.previewSize!;
@@ -349,19 +403,28 @@ class _MudraScreenState extends State<MudraScreen> {
             child: Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _target,
-                items: [
-                  for (final n in _clf!.classes)
-                    DropdownMenuItem(value: n, child: Text(n))
-                ],
-                onChanged: (v) => setState(() {
-                  _target = v!;
-                  _timer?.cancel();
-                  _phase = Phase.live;
-                }),
-              ),
+              child: Row(children: [
+                Expanded(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _target,
+                    items: [
+                      for (final n in _clf!.classes)
+                        DropdownMenuItem(value: n, child: Text(n))
+                    ],
+                    onChanged: (v) => setState(() {
+                      _target = v!;
+                      _timer?.cancel();
+                      _phase = Phase.live;
+                    }),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.menu_book),
+                  tooltip: 'Learn this mudra',
+                  onPressed: _showLearn,
+                ),
+              ]),
             ),
           ),
           if (_phase == Phase.result)
